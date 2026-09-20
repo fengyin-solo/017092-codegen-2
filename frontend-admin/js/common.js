@@ -18,6 +18,8 @@
 
   // ====================== 导航高亮 ======================
   var path = window.location.pathname.replace(/^\//, '').replace(/\.html$/, '') || 'index';
+  // 分布分析从概览进入，高亮「概览」导航
+  if (path === 'distribution') path = 'index';
   document.querySelectorAll('.nav-item').forEach(function (el) {
     var href = (el.getAttribute('href') || '').replace(/\.html$/, '') || 'index';
     if (href === path) el.classList.add('router-active');

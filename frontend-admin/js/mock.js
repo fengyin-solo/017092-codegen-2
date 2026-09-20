@@ -297,7 +297,7 @@
       var finalId = (id && String(id).trim()) ? String(id).trim() : nextId('M', list);
       list.push({ id: finalId, name: name || '新商家' });
       save('merchants', list);
-      var all = load('merchantKnowledge', {});
+      var all = load('merchantKnowledge', defaultMerchantKnowledge);
       all[finalId] = [];
       save('merchantKnowledge', all);
       return list[list.length - 1];
@@ -386,7 +386,7 @@
       var id = nextId('SET', sets);
       sets.push({ id: id, name: name, merchantIds: merchantIds || [] });
       save('merchantSets', sets);
-      var all = load('merchantSetKnowledge', {});
+      var all = load('merchantSetKnowledge', defaultMerchantSetKnowledge);
       all[id] = [];
       save('merchantSetKnowledge', all);
       return sets[sets.length - 1];
@@ -451,7 +451,7 @@
       var name = (level2 == null || level2 === '') ? level1 : (level1 + ' / ' + level2);
       list.push({ id: id, level1: level1, level2: level2 || '', name: name });
       save('industries', list);
-      var all = load('industryKnowledge', {});
+      var all = load('industryKnowledge', defaultIndustryKnowledge);
       all[id] = [];
       save('industryKnowledge', all);
       return list[list.length - 1];

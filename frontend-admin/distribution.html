@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%23111' width='32' height='32' rx='4'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='%23fff' font-family='system-ui'>知</text></svg>" />
+  <title>分布分析 - 知识配置平台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/tailwind-config.js"></script>
+  <link href="css/common.css" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-canvas text-slate-600 font-sans antialiased min-h-screen selection:bg-emerald-900 selection:text-white">
+  <div id="app" class="flex min-h-screen">
+    <aside class="app-sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon flex items-center justify-center">
+          <span class="iconify" data-icon="lucide:book-open" data-width="20" data-height="20"></span>
+        </div>
+        <span class="sidebar-logo-text">知识配置平台</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item router-active"><span class="iconify nav-item-icon" data-icon="lucide:layout-dashboard" data-width="18" data-height="18"></span>概览</a>
+        <a href="merchant.html" class="nav-item"><span class="iconify nav-item-icon" data-icon="lucide:store" data-width="18" data-height="18"></span>商家知识</a>
+        <a href="merchant-set.html" class="nav-item"><span class="iconify nav-item-icon" data-icon="lucide:layers" data-width="18" data-height="18"></span>商家集合知识</a>
+        <a href="industry.html" class="nav-item"><span class="iconify nav-item-icon" data-icon="lucide:briefcase" data-width="18" data-height="18"></span>行业知识</a>
+        <a href="global.html" class="nav-item"><span class="iconify nav-item-icon" data-icon="lucide:globe" data-width="18" data-height="18"></span>通用知识</a>
+      </nav>
+    </aside>
+    <main class="flex-1 flex flex-col min-w-0">
+      <header class="app-header border-b border-slate-200">
+        <span class="app-header-title text-slate-700 font-medium">知识配置平台</span>
+      </header>
+      <div class="flex-1 p-6 md:p-8 space-y-8">
+        <div>
+          <h2 class="section-title tracking-tight text-slate-900 mb-2">分布分析</h2>
+          <p class="section-desc text-sm text-slate-500">按商家与行业查看知识数量分布，数量为 0 的对象会一并展示，便于排查知识覆盖不足。</p>
+        </div>
+
+        <!-- 分布图表：按商家 / 按行业 切换 -->
+        <section class="premium-card rounded-xl border border-slate-100 shadow-sm p-6">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h3 class="text-base font-semibold text-slate-900" id="distChartTitle">各商家知识数量</h3>
+            <div class="flex gap-2">
+              <button type="button" id="tabMerchant" class="import-tab-btn import-tab-active">按商家</button>
+              <button type="button" id="tabIndustry" class="import-tab-btn">按行业</button>
+            </div>
+          </div>
+          <div class="h-64 md:h-72">
+            <canvas id="chartDist"></canvas>
+          </div>
+        </section>
+
+        <!-- 分布明细：每个对象的知识数量（含 0） -->
+        <section class="premium-card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
+          <div class="table-wrap">
+            <table class="w-full text-sm">
+              <thead>
+                <tr>
+                  <th class="w-40" id="distIdHeader">商家 ID</th>
+                  <th id="distNameHeader">商家名称</th>
+                  <th class="text-right w-40">知识数量</th>
+                </tr>
+              </thead>
+              <tbody id="distTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="js/mock.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+(function () {
+  var P = 'knowledge_platform_';
+  function load(key, fallback) {
+    try {
+      var s = localStorage.getItem(P + key);
+      return s != null ? JSON.parse(s) : fallback;
+    } catch (_) { return fallback; }
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str == null ? '' : str;
+    return div.innerHTML;
+  }
+
+  // 与概览同一口径：优先走 MockStore（每次从 localStorage 读最新数据）
+  function getDistribution(view) {
+    if (view === 'merchant') {
+      var merchants = (typeof MockStore !== 'undefined')
+        ? MockStore.getMerchants()
+        : load('merchants', [{ id: 'M001' }, { id: 'M002' }, { id: 'M003' }]);
+      var merchantKnowledge = load('merchantKnowledge', {});
+      return merchants.map(function (m) {
+        var count = (typeof MockStore !== 'undefined')
+          ? MockStore.getMerchantKnowledge(m.id).length
+          : (merchantKnowledge[m.id] || []).length;
+        return { id: m.id, name: m.name || m.id, count: count };
+      });
+    }
+    var industries = (typeof MockStore !== 'undefined')
+      ? MockStore.getIndustries()
+      : load('industries', [{ id: 'IND01' }, { id: 'IND02' }, { id: 'IND03' }]);
+    var industryKnowledge = load('industryKnowledge', {});
+    return industries.map(function (i) {
+      var count = (typeof MockStore !== 'undefined')
+        ? MockStore.getIndustryKnowledge(i.id).length
+        : (industryKnowledge[i.id] || []).length;
+      return { id: i.id, name: i.name || i.id, count: count };
+    });
+  }
+
+  // 视图配置：配色沿用概览图表中「商家知识」「行业知识」的色系
+  var VIEWS = {
+    merchant: {
+      chartTitle: '各商家知识数量',
+      idHeader: '商家 ID',
+      nameHeader: '商家名称',
+      datasetLabel: '知识数量（条）',
+      color: '#7c3aed',
+      colorLight: '#a78bfa'
+    },
+    industry: {
+      chartTitle: '各行业知识数量',
+      idHeader: '行业 ID',
+      nameHeader: '行业名称',
+      datasetLabel: '知识数量（条）',
+      color: '#059669',
+      colorLight: '#34d399'
+    }
+  };
+
+  var state = { view: 'merchant' };
+  var chart = null;
+
+  var elements = {
+    chartTitle: document.getElementById('distChartTitle'),
+    idHeader: document.getElementById('distIdHeader'),
+    nameHeader: document.getElementById('distNameHeader'),
+    tableBody: document.getElementById('distTableBody'),
+    tabMerchant: document.getElementById('tabMerchant'),
+    tabIndustry: document.getElementById('tabIndustry')
+  };
+
+  function renderTable(rows) {
+    elements.tableBody.innerHTML = rows.map(function (row) {
+      var countHtml = '<span class="tabular-nums font-semibold ' + (row.count === 0 ? 'text-amber-600' : 'text-slate-900') + '">' + row.count + '</span>' +
+        ' <span class="text-sm text-slate-500">条</span>';
+      if (row.count === 0) {
+        countHtml += ' <span class="text-xs font-medium text-amber-600">未覆盖</span>';
+      }
+      return '<tr>' +
+        '<td class="font-mono text-sm text-slate-700">' + escapeHtml(row.id) + '</td>' +
+        '<td class="text-slate-800">' + escapeHtml(row.name) + '</td>' +
+        '<td class="text-right">' + countHtml + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function render() {
+    var view = VIEWS[state.view];
+    var rows = getDistribution(state.view);
+    var labels = rows.map(function (r) { return r.name + '（' + r.id + '）'; });
+    var counts = rows.map(function (r) { return r.count; });
+
+    elements.chartTitle.textContent = view.chartTitle;
+    elements.idHeader.textContent = view.idHeader;
+    elements.nameHeader.textContent = view.nameHeader;
+    elements.tabMerchant.classList.toggle('import-tab-active', state.view === 'merchant');
+    elements.tabIndustry.classList.toggle('import-tab-active', state.view === 'industry');
+
+    renderTable(rows);
+
+    if (typeof Chart === 'undefined') return;
+    var canvas = document.getElementById('chartDist');
+    if (!canvas) return;
+
+    if (chart) {
+      chart.data.labels = labels;
+      chart.data.datasets[0].label = view.datasetLabel;
+      chart.data.datasets[0].data = counts;
+      chart.data.datasets[0].backgroundColor = view.colorLight;
+      chart.data.datasets[0].borderColor = view.color;
+      chart.update();
+      return;
+    }
+
+    // 与概览柱状图同一配置风格：从 0 开始、Y 轴整数、隐藏图例
+    chart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: view.datasetLabel,
+          data: counts,
+          backgroundColor: view.colorLight,
+          borderColor: view.color,
+          borderWidth: 1,
+          borderRadius: 6,
+          borderSkipped: false,
+          barPercentage: 0.6,
+          categoryPercentage: 0.65,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15,23,42,0.9)',
+            padding: 12,
+            titleFont: { size: 13 },
+            bodyFont: { size: 12 },
+            callbacks: {
+              label: function (ctx) {
+                return ctx.dataset.label.replace('（条）', '') + '：' + ctx.raw + ' 条';
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: '数值',
+              font: { size: 12 },
+              color: '#64748b'
+            },
+            ticks: {
+              font: { size: 12 },
+              color: '#94a3b8',
+              stepSize: 1,
+              callback: function (v) { return Number.isInteger(v) ? v : ''; }
+            },
+            grid: { color: 'rgba(148,163,184,0.2)' }
+          },
+          x: {
+            ticks: { font: { size: 11 }, color: '#64748b', maxRotation: 25 },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  }
+
+  elements.tabMerchant.addEventListener('click', function () {
+    if (state.view === 'merchant') return;
+    state.view = 'merchant';
+    render();
+  });
+  elements.tabIndustry.addEventListener('click', function () {
+    if (state.view === 'industry') return;
+    state.view = 'industry';
+    render();
+  });
+
+  render();
+})();
+  </script>
+</body>
+</html>
