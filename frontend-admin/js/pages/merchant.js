@@ -728,6 +728,11 @@
     cacheElements();
     bindEvents();
     MerchantManager.render();
+    // 支持从知识分布分析页带 merchantId 跳转后预选商家
+    var presetMerchantId = new URLSearchParams(global.location.search).get('merchantId');
+    if (presetMerchantId && state.merchants.some(function (m) { return m.id === presetMerchantId; })) {
+      state.currentMerchantId = presetMerchantId;
+    }
     MerchantManager.fillSelect();
     KnowledgeManager.render();
   }

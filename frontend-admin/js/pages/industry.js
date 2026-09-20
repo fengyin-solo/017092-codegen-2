@@ -494,10 +494,15 @@
   function init() {
     state.level1Options = MockStore.industryLevel1Options;
     state.level2Map = MockStore.industryLevel2Map;
-    
+
     cacheElements();
     bindEvents();
     IndustryManager.render();
+    // 支持从知识分布分析页带 industryId 跳转后预选行业
+    var presetIndustryId = new URLSearchParams(global.location.search).get('industryId');
+    if (presetIndustryId && state.industries.some(function (i) { return i.id === presetIndustryId; })) {
+      state.currentIndustryId = presetIndustryId;
+    }
     IndustryManager.fillSelect();
     KnowledgeManager.render();
   }

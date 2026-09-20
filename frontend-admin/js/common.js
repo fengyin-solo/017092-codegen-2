@@ -18,9 +18,11 @@
 
   // ====================== 导航高亮 ======================
   var path = window.location.pathname.replace(/^\//, '').replace(/\.html$/, '') || 'index';
+  // 知识分布分析从概览进入，侧栏同样高亮「概览」
+  var activePath = path === 'distribution' ? 'index' : path;
   document.querySelectorAll('.nav-item').forEach(function (el) {
     var href = (el.getAttribute('href') || '').replace(/\.html$/, '') || 'index';
-    if (href === path) el.classList.add('router-active');
+    if (href === activePath) el.classList.add('router-active');
     else el.classList.remove('router-active');
   });
 
